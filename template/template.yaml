@@ -1,0 +1,89 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-template
+kind: Template
+metadata:
+  name: team-demo-s3
+  title: team-demo-s3
+  description: Self service an team-demo-s3 resource
+spec:
+  owner: product-a
+  type: resource
+
+  parameters:
+    - title: Resource name
+      required:
+        - name
+        - version
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Name scoped to the the component
+          ui:options:
+            rows: 5
+        version:
+          title: Version
+          type: string
+          description: Unique name of the component
+          ui:options:
+            rows: 5
+
+    - title: Choose the component location
+      required:
+        - component
+        - owner
+      properties:
+        component:
+          title: Component
+          type: string
+          ui:field: EntityPicker
+          ui:options:
+            allowedKinds:
+              - component
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the component
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+
+  steps:
+    - id: fetch-base
+      name: Fetch golang starter template
+      action: fetch:template
+      input:
+        url: ./content
+        values:
+          name : ${{ parameters.name | lower | replace(" ", "-") }}
+          version: ${{ parameters.version }}
+          component: ${{ parameters.component }}
+          owner: ${{ parameters.owner }}
+          resource: TW-SEA-EMPC/team-demo-s3
+
+    - id: pull-request-resource
+      name: Create PR for resource
+      action: publish:github:pull-request
+      input:
+        title: "Add ${{ parameters.name }} resource to ${{ parameters.component }}"
+        description: "This is an automatically generated pull request to add ${{ parameters.name }} component"
+        branchName: add-${{ parameters.name | lower | replace(' ', '-') }}-resources
+        repoUrl: github.com?repo=${{ parameters.component | replace("component:","") }}&owner=TW-SEA-EMPC
+
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: https://github.com/TW-SEA-EMPC/${{ parameters.component | replace("component:","") }}/blob/main
+        catalogInfoPath: /resources/${{ parameters.name | lower | replace(' ', '-') }}/catalog-info.yaml
+        optional: true
+
+  output:
+    links:
+      - title: Open resource in catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+      - title: Resources PR
+        url: ${{ steps['pull-request-resource'].output.remoteUrl }}
